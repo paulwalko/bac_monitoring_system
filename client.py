@@ -4,7 +4,7 @@ import argparse
 
 import pika
 
-from rmq_params import rmq_params
+from params import rmq_params, socket_params
 
 def checkpoint(message):
     """Prints [CHeckpoint] <message>
@@ -30,9 +30,9 @@ def main():
     parser = argparse.ArgumentParser(description='Processses arguments')
     parse.add_argument('-s', help='Set server IP or hostname', required=True)
     parse.add_argument('-p', help='Set server Port to receive messages on',
-                       default=8080)
+                       default=socket_params['port'])
     parse.add_argument('-z', help='Set size for socket to recive messages',
-                       default=1024)
+                       default=socket_params['size'])
 
     # Process args
     args = parser.parse_args()

@@ -7,3 +7,5 @@ rmq_params = {'vhost': 'my_vhost',
               'password': 'pass',
               'exchange': 'my_exchange',
               'order_queue': 'my_order_queue'}
+socket_params = {'size': 1024,
+                 'port': 8080}

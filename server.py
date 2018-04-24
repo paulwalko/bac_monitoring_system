@@ -102,6 +102,14 @@ def allowed_drinks(id):
     return drinks_left
 
 def main():
+    """Create & start 'drinks' queue for submitting drinks
+    """
+
+    # Create order queue
+    # TODO
+
+    # Start consuming drink queue
+    # TODO
 
     # Arguments
     id = 123456

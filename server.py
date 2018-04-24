@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from datetime import datetime
+import math
 from time import sleep
 
 import pymongo
@@ -91,14 +92,11 @@ def allowed_drinks(id):
 
     # Remove all drinks not contributing to current BAC
     remove_drinks(id, finished_drinks)
-
-    # Intoxicated, no drinks consumed, or some drinks consumed
-    drinks_left = 0
-    if bac == 0:
-        drinks_left = int(.06 / one_drink)
-    elif bac < .06:
-        drinks_left = int(.06 / bac)
+    
+    # Calculate drinks left
+    drinks_left = int(math.ceil((.06 - bac) / one_drink))
     checkpoint("Allowed drinks for id \'{}\': {}".format(id, drinks_left))
+   
     return drinks_left
 
 def main():
@@ -113,14 +111,18 @@ def main():
 
     # Arguments
     id = 123456
-    #remove_drinks(id, [1523206500])
     remove_drinks(id)
+    print()
+    allowed_drinks(id)
+    print()
     add_drink(id)
+    allowed_drinks(id)
+    print()
     sleep(2)
     add_drink(id)
-    sleep(3)
+    allowed_drinks(id)
+    print()
     add_drink(id)
-
     allowed_drinks(id)
 
 main()

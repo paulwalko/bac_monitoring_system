@@ -50,12 +50,13 @@ def main():
     parser.add_argument('-b', help='Set socket backlog size',
                        default=socket_params['backlog'])
 
-    # Process args
+    # Process args & contants
     args = parser.parse_args()
     rmq_host = args.s
     socket_port = int(args.p)
     socket_size = int(args.z)
     socket_backlog = int(args.b)
+    socket_host = my_ip()
 
     # Setup RabbitMQ
     credentials = pika.PlainCredentials(rmq_params['username'],
@@ -72,6 +73,13 @@ def main():
     channel.queue_bind(exchange=rmq_params['exchange'],
                        queue=rmq_params['order_queue'])
 
+    # Setup socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind((socket_host, socket_port))
+    s.listen(socket_backlog)
+    checkpoint("Created socket at {} on port {}"
+        .format(socket_host, socket_port))
+
     # Continuously listen for RFID ids
     while True:
         # TODO
@@ -79,7 +87,6 @@ def main():
         # TODO
 
         rfid_id = '123456'
-        socket_host = my_ip()
         order_data = {'id': rfid_id, 'ip': socket_host, 'port': socket_port,
                       'size': socket_size}
 
@@ -91,16 +98,7 @@ def main():
                               body=str(order_data))
         checkpoint("Getting status for id \'{}\'".format(rfid_id))
 
-
         ## Wait for response from server for drink order
-        # Setup socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        s.bind((socket_host, socket_port))
-        s.listen(socket_backlog)
-        checkpoint("Created socket at {} on port {}"
-            .format(socket_host, socket_port))
-
         # Listen for reply from server
         server, address = s.accept()
         svr_addr = server.getpeername()[0]
@@ -112,10 +110,8 @@ def main():
         recv_data = server.recv(socket_size)
         recv_data = pickle.loads(recv_data)
         checkpoint("Received data: {}".format(recv_data))
-        s.close()
 
         # Update GUI based on response
         process_response(recv_data)
-        break
 
 main()

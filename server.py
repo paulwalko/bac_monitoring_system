@@ -150,7 +150,6 @@ def reject_callback(ch, method, properties, body):
     # Remove most recent drink
     remove_drink = get_info(id)['drinks'][-1]
     remove_drinks(id, [remove_drink])
-    checkpoint("Removed most recent drink for \'{}\'".format(id))
 
 def main():
     """Create & start 'drinks' queue for submitting drinks

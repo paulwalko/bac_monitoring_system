@@ -101,8 +101,13 @@ def allowed_drinks(id):
     # Calculate drinks left
     drinks_left = int(math.ceil((.06 - bac) / one_drink))
     checkpoint("Allowed drinks for id \'{}\': {}".format(id, drinks_left))
-   
-    return drinks_left
+  
+    # Calculate time left till they can drink again
+    time_left = 0
+    if bac > .06:
+        time_left = ((bac - .06) / .01) * (2 / 3)
+
+    return drinks_left, time_left
 
 def order_callback(ch, method, properties, body):
     """Process 1 drink being ordered
@@ -118,7 +123,7 @@ def order_callback(ch, method, properties, body):
     port = int(client_params.get('port'))
     
     add_drink(id)
-    drinks = allowed_drinks(id)
+    drinks, time = allowed_drinks(id)
 
     # Add drink for user
 
@@ -130,7 +135,7 @@ def order_callback(ch, method, properties, body):
         checkpoint("Created socket at {} on port {}".format(host, port))
 
         # Send num drinks to client
-        s.send(pickle.dumps(drinks))
+        s.send(pickle.dumps((drinks, time)))
         s.close()
     except Exception as ex:
         print(ex)

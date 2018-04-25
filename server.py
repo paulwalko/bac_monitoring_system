@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
+import ast
 from datetime import datetime
 import math
+import socket
 from time import sleep
 
+import pickle
 import pymongo
+import pika
 
+from params import rmq_params, socket_params
 
 def checkpoint(message):
     """Prints [CHeckpoint] <message>
@@ -99,30 +104,85 @@ def allowed_drinks(id):
    
     return drinks_left
 
+def order_callback(ch, method, properties, body):
+    """Process 1 drink being ordered
+    """
+
+    # Decode body
+    body = body.decode('utf-8')
+    client_params = ast.literal_eval(body)
+
+    # Extract things from client data
+    id = int(client_params.get('id'))
+    host = client_params.get('ip')
+    port = int(client_params.get('port'))
+    
+    add_drink(id)
+    drinks = allowed_drinks(id)
+
+    # Add drink for user
+
+    # Try to send response to client
+    try:
+        # Connect to client socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((host, port))
+        checkpoint("Created socket at {} on port {}".format(host, port))
+
+        # Send num drinks to client
+        s.send(pickle.dumps(drinks))
+        s.close()
+    except Exception as ex:
+        print(ex)
+
+def reject_callback(ch, method, properties, body):
+    """Remove most recent drink for user
+    """
+
+    # Decode body
+    id = int(body.decode('utf-8'))
+
+    # Remove most recent drink
+    remove_drink = get_info(id)['drinks'][-1]
+    remove_drinks(id, [remove_drink])
+    checkpoint("Removed most recent drink for \'{}\'".format(id))
+
 def main():
     """Create & start 'drinks' queue for submitting drinks
     """
+    # Temp TODO
+    remove_drinks(123456)
+
+    # Connect to RMQ
+    credentials = pika.PlainCredentials(rmq_params['username'], rmq_params['password'])
+    parameters = pika.ConnectionParameters(host='localhost',
+                                           virtual_host=rmq_params['vhost'],
+                                           credentials=credentials)
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
+
+    checkpoint('Connect to RMQ server')
 
     # Create order queue
-    # TODO
+    checkpoint('Setting up exchanges and queue...')
+    channel.exchange_declare(exchange=rmq_params['exchange'],
+                             exchange_type='direct',
+                             auto_delete=True)
+    channel.queue_declare(queue=rmq_params['order_queue'], auto_delete=True)
+    channel.queue_bind(exchange=rmq_params['exchange'], queue=rmq_params['order_queue'])
+    channel.queue_declare(queue=rmq_params['reject_queue'], auto_delete=True)
+    channel.queue_bind(exchange=rmq_params['exchange'], queue=rmq_params['reject_queue'])
 
     # Start consuming drink queue
-    # TODO
+    channel.basic_consume(lambda ch, method, properties,
+                          body: order_callback(ch, method, properties, body),
+                          queue=rmq_params['order_queue'], no_ack=True)
+    channel.basic_consume(lambda ch, method, properties,
+                          body: reject_callback(ch, method, properties, body),
+                          queue=rmq_params['reject_queue'], no_ack=True)
 
-    # Arguments
-    id = 123456
-    remove_drinks(id)
-    print()
-    allowed_drinks(id)
-    print()
-    add_drink(id)
-    allowed_drinks(id)
-    print()
-    sleep(2)
-    add_drink(id)
-    allowed_drinks(id)
-    print()
-    add_drink(id)
-    allowed_drinks(id)
+    checkpoint("Consuming RMQ queues: \'{}\' and \'{}\'"
+        .format(rmq_params['order_queue'], rmq_params['reject_queue']))
+    channel.start_consuming()
 
 main()

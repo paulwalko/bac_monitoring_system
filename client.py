@@ -26,6 +26,10 @@ def my_ip():
 def process_response(response):
     """Process response from serve & update GUI
     """
+
+    id = response[0]
+    time = response[1]
+
     # Update GUI with color
     # TODO
     color = 'red'
@@ -35,6 +39,11 @@ def process_response(response):
     # TODO
     reject = False
     checkpoint("Drink rejected? \'{}\'".format(reject))
+    if reject: 
+        channel.basic_publish(exchange=rmq_params['exchange'],
+                              routing_key=rmq_params['order_queue'],
+                              body=str(id))
+        
 
     return
 
@@ -85,6 +94,7 @@ def main():
         # TODO
         print('Continuously listen for RFID ids')
         # TODO
+        input()
 
         rfid_id = '123456'
         order_data = {'id': rfid_id, 'ip': socket_host, 'port': socket_port,

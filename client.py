@@ -62,8 +62,21 @@ def retrieve_input():
 
 
 def update_gui(numDrinks, timeLeft):
+    if numDrinks <= 0:
+        change_red()
+    elif numDrinks == 1:
+        change_yellow()
+    else:
+        change_green()
     v.set(numDrinks)
     v1.set(timeLeft)
+
+def change_red():
+    root.configure(background="red")
+def change_yellow():
+    root.configure(background="yellow")
+def change_green():
+    root.configure(background="green")
 
 def checkpoint(message):
     """Prints [Checkpoint] <message>

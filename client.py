@@ -62,9 +62,9 @@ def retrieve_input():
 
 
 def update_gui(numDrinks, timeLeft):
-    if numDrinks <= 0:
+    if int(numDrinks) <= 0:
         change_red()
-    elif numDrinks == 1:
+    elif int(numDrinks) == 1:
         change_yellow()
     else:
         change_green()

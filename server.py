@@ -13,9 +13,14 @@ import pika
 from params import rmq_params, socket_params
 
 def checkpoint(message):
-    """Prints [CHeckpoint] <message>
+    """Prints [Checkpoint] <message>
     """
     print("[Checkpoint] {}".format(message))
+
+def error(message):
+    """Prints [ERROR] <message>
+    """
+    print("[ERROR] {}".format(message))
 
 def get_info(id):
     """Looks up all data for an id
@@ -24,7 +29,7 @@ def get_info(id):
 
     # Connect to mongodb & return user
     collection = pymongo.MongoClient().group23.bac_monitoring
-    return collection.find({'id': 123456})[0]
+    return collection.find({'id': id})[0]
 
 def add_drink(id):
     """Adds 1 drink to the user
@@ -66,14 +71,34 @@ def allowed_drinks(id):
     """
     ## Calculate current BAC
     # Lookup BAC for 1 drink
-    user_info = get_info(id)
-    bac_lookup = {'M': {'100': .06, '120': .05, '140': .045, '160': .04,
-                        '180': .035, '200': .03, '220': .033, '240': .025},
-                  'F': {'100': .07, '120': .06, '140': .05,  '160': .04,
-                        '180': .04,  '200': .035, '220': .03, '240': .03}}
-    # Lookup gender & rounded weight
+
+    # Account for database errors
+    try:
+        user_info = get_info(id)
+    except Exception as ex:
+        error('User not found in database')
+        return 0, 0
+
+    bac_lookup = {'M': {'80':  .07,  '100': .06,  '120': .05,  '140': .045,
+                        '160': .04,  '180': .035, '200': .03,  '220': .033,
+                        '240': .025, '260': .02,  '280': .015, '300': .01,
+                        '320': .005, '340': .003, '360': .002, '380': .001},
+                  'F': {'80':  .08,  '100': .07,  '120': .06,  '140': .05,
+                        '160': .04,  '180': .04,  '200': .035, '220': .03,
+                        '240': .03, '260': .025,  '280': .02,  '300': .015,
+                        '320': .01, '340': .003,  '360': .002, '380': .001}}
+    # Round weight to the nearest increment of 20
     weight = int(20 * round(float(user_info['weight']) / 20))
-    one_drink = bac_lookup[user_info['gender']][str(weight)]
+
+    # Lookup gender & rounded weight
+    if weight < 80:
+        checkpoint('Weight too low')
+        return 0, 9999
+    elif weight > 380:
+        checkpoint('ERROR: Weight too high. Using .001 for one drink.')
+        one_drink = .001
+    else:
+        one_drink = bac_lookup[user_info['gender']][str(weight)]
 
     # Add up BAC for each drink
     bac = 0
@@ -91,6 +116,9 @@ def allowed_drinks(id):
             finished_drinks.append[drink]
         else:
             bac += drink_bac
+    
+    # Round to 2 places
+    bac = round(bac, 2)
 
     # Debugging
     checkpoint("BAC for \'{}\': {}".format(id, bac))
@@ -117,15 +145,23 @@ def order_callback(ch, method, properties, body):
     body = body.decode('utf-8')
     client_params = ast.literal_eval(body)
 
-    # Extract things from client data
-    id = int(client_params.get('id'))
-    host = client_params.get('ip')
-    port = int(client_params.get('port'))
-    
-    add_drink(id)
-    drinks, time = allowed_drinks(id)
+    # Try to get host & port
+    try:
+        host = client_params.get('ip')
+        port = int(client_params.get('port'))
+    except Exception as ex:
+        error(ex)
+        return
 
-    # Add drink for user
+    # Try to get id
+    try:
+        id = int(client_params.get('id'))
+        # Add drink for user
+        add_drink(id)
+        drinks, time = allowed_drinks(id)
+    except Exception as ex:
+        error(ex)
+        drinks, time = 0, 0
 
     # Try to send response to client
     try:
@@ -138,7 +174,7 @@ def order_callback(ch, method, properties, body):
         s.send(pickle.dumps((drinks, time)))
         s.close()
     except Exception as ex:
-        print(ex)
+        error(ex)
 
 def reject_callback(ch, method, properties, body):
     """Remove most recent drink for user
@@ -154,8 +190,8 @@ def reject_callback(ch, method, properties, body):
 def main():
     """Create & start 'drinks' queue for submitting drinks
     """
-    # Temp TODO
-    remove_drinks(123456)
+    # Remove drinks before we start
+    remove_drinks()
 
     # Connect to RMQ
     credentials = pika.PlainCredentials(rmq_params['username'], rmq_params['password'])

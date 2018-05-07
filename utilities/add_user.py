@@ -11,13 +11,13 @@ def checkpoint(message):
 def main():
     """Adds new user to mongodb
     """
-    id = 123456
-    weight = 150
-    gender = 'F'
+    id = 444444 
+    weight = 240 
+    gender = 'M'
     
     # Connect to mongodb & add user
     collection = pymongo.MongoClient().group23.bac_monitoring
-    collection.update({'id': 123456}, {'$set': {'weight': weight, 'gender': gender}}, upsert=True)
+    collection.update({'id': id}, {'$set': {'weight': weight, 'gender': gender}}, upsert=True)
     checkpoint("Added user \'{}\' with weight {} and gender {}"
         .format(id, weight, gender))
 
